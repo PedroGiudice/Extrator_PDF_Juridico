@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Extrator de Texto Processual — v2.3 (Offline, hotfix 2)</title>
+  <style>
+    :root{ --bg:#0b0d12; --panel:#121723; --muted:#8892a6; --fg:#e6e9ef; --accent:#4cc9f0; --warning:#f7b267; --danger:#ff6b6b; --ok:#53e2ae; --mono: ui-monospace, Menlo, Consolas, "Cascadia Code", "Fira Code", monospace; --sans: "Century Gothic","Segoe UI",system-ui,-apple-system,Roboto,"Helvetica Neue",Arial,sans-serif; --radius:12px; --shadow:0 10px 30px rgba(0,0,0,.35);} 
+    html,body{height:100%}
+    body{margin:0;background:linear-gradient(180deg,#0b0d12 0%, #0d111a 70%, #0b0d12 100%);color:var(--fg);font-family:var(--sans);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+    .wrap{max-width:1280px;margin:40px auto;padding:0 20px}
+    header{margin-bottom:24px}
+    h1{margin:0;font-size:28px;letter-spacing:.3px}
+    h2{margin:8px 0 0 0;font-weight:400;color:var(--muted);font-size:15px}
+    .card{background:var(--panel);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
+    .card__head{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid rgba(255,255,255,.06)}
+    .card__title{font-size:16px;font-weight:600}
+    .card__body{padding:18px 20px}
+    .grid{display:grid;gap:16px}
+    @media (min-width:1024px){.grid-cols-2{grid-template-columns:1fr 1fr}.fullheight{grid-auto-rows:minmax(0,1fr)}.sticky{position:sticky;top:16px}}
+    .stack{display:flex;flex-direction:column;gap:16px}
+    .file-input{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .file-input input[type=file]{display:none}
+    .btn{appearance:none;border:0;border-radius:10px;padding:12px 16px;font-weight:600;cursor:pointer;color:#0b0d12;background:var(--accent);transition:transform .05s ease, box-shadow .2s}
+    .btn:hover{transform:translateY(-1px)}
+    .btn.secondary{background:#30384a;color:var(--fg)} .btn.ghost{background:transparent;color:var(--fg);border:1px solid rgba(255,255,255,.14)} .btn.warn{background:var(--warning);color:#111} .btn.ok{background:var(--ok);color:#111} .btn.danger{background:var(--danger);color:#fff}
+    .muted{color:var(--muted);font-size:13px}
+    .switch{display:flex;align-items:center;gap:10px}
+    .switch input{width:18px;height:18px}
+    .row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px dashed rgba(255,255,255,.06)} .row:last-child{border-bottom:0}
+    .small{font-size:12px;color:var(--muted)}
+    .radio-group{display:flex;gap:8px;flex-wrap:wrap} .radio{background:#0f1320;border:1px solid rgba(255,255,255,.1);padding:8px 12px;border-radius:999px;display:flex;gap:8px;align-items:center;cursor:pointer} .radio input{accent-color:var(--accent)}
+    .slider{display:flex;gap:12px;align-items:center} .slider input{width:160px}
+    textarea#output{width:100%;min-height:60vh;background:#0b0f19;color:var(--fg);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px;font-family:var(--mono);font-size:14px;resize:vertical}
+    .diag{background:#0b0f19;border:1px dashed rgba(255,255,255,.14);border-radius:10px;padding:12px;font-family:var(--mono);font-size:12px;white-space:pre-wrap;color:#cbd5e1}
+    footer{margin:24px 0;color:var(--muted);text-align:center;font-size:12px}
+    .banner{background:#13211f;border:1px solid #2a4b45;color:#c7ffec;padding:10px 12px;border-radius:10px;margin-bottom:10px;display:none}
+    .banner.error{background:#2a1517;border-color:#5a272b;color:#ffd2d2}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Extrator de Texto Processual</h1>
+      <h2>Processamento de documentos jurídicos brasileiros</h2>
+    </header>
+
+    <div id="offlineBanner" class="banner">Modo offline pronto. Se o PDF não processar abrindo via <code>file://</code>, use o script <strong>start_local_server.ps1</strong> e acesse <code>http://localhost:5500</code>.</div>
+    <div id="errorBanner" class="banner error"></div>
+
+    <div class="grid grid-cols-2 fullheight">
+      <!-- Esquerda -->
+      <div class="stack">
+        <section class="card">
+          <div class="card__head">
+            <div class="card__title">SELECIONAR ARQUIVO PDF</div>
+            <div class="muted" id="fileName">Nenhum arquivo selecionado</div>
+          </div>
+          <div class="card__body">
+            <div class="file-input">
+              <label class="btn" for="pdfFile">Escolher arquivo</label>
+              <input id="pdfFile" type="file" accept="application/pdf,.pdf,.txt" />
+              <button class="btn secondary" id="processBtn">Processar</button>
+              <button class="btn ghost" id="previewRemovedBtn">Prévia das Remoções</button>
+              <button class="btn ok" id="downloadTxtBtn" disabled>Baixar TXT</button>
+              <button class="btn warn" id="downloadDocxBtn" disabled>Baixar DOCX</button>
+            </div>
+            <p class="small">100% offline. Se abrir via <code>file://</code> e o PDF não carregar, execute <strong>start_local_server.ps1</strong> e acesse <code>http://localhost:5500</code>.</p>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card__head"><div class="card__title">CONFIGURAÇÕES DE FILTRAGEM</div></div>
+          <div class="card__body">
+            <div class="row switch"><div><div>Remover códigos hash, SHA-256, MD5 e identificadores hexadecimais</div><div class="small">Ex.: <code>e3b0c442...</code>, <code>SHA-256:</code>, <code>MD5:</code></div></div><input type="checkbox" id="rmHash" checked /></div>
+            <div class="row switch"><div><div>Remover assinaturas digitais, certificados ICP-Brasil e validações eletrônicas</div><div class="small">Selos, carimbos de tempo, cadeias e carimbos de verificação</div></div><input type="checkbox" id="rmAssinaturaDigital" checked /></div>
+            <div class="row switch"><div><div>Remover protocolos eletrônicos, carimbos de tempo e códigos verificadores</div></div><input type="checkbox" id="rmProtocolos" checked /></div>
+            <div class="row switch"><div><div>Remover selos eletrônicos e códigos de autenticidade</div></div><input type="checkbox" id="rmSelos" checked /></div>
+            <div class="row switch"><div><div>Ignorar conteúdo nas margens laterais (selos e-SAJ)</div></div><input type="checkbox" id="ignoreSide" checked /></div>
+            <div class="row switch"><div><div>Remover numeração de páginas do sistema</div></div><input type="checkbox" id="rmPagenum" checked /></div>
+            <div class="row switch"><div><div>Normalizar quebras de linha e espaçamentos</div></div><input type="checkbox" id="normalizeBreaks" checked /></div>
+            <div class="row"><div><div>Modo de limpeza (cabeçalho/rodapé de escritório)</div><div class="small">Leve · Moderado · Agressivo</div></div>
+              <div class="radio-group" id="modeGroup">
+                <label class="radio"><input type="radio" name="mode" value="leve" checked> Leve</label>
+                <label class="radio"><input type="radio" name="mode" value="moderado"> Moderado</label>
+                <label class="radio"><input type="radio" name="mode" value="agressivo"> <span style="color:var(--danger)">Agressivo</span></label>
+              </div>
+            </div>
+            <div class="row slider"><div style="flex:1"><div>Largura da margem lateral <span id="sideWidthVal">15</span>%</div><div class="small">Margem conservadora para proteger conteúdo útil mal formatado</div></div><input id="sideWidth" type="range" min="5" max="30" value="15" /></div>
+            <div class="row switch"><div><div>Remover cabeçalho/rodapé de escritório por repetição</div><div class="small">Endereços, sites, telefones, OAB no timbre</div></div><input type="checkbox" id="rmHeaderFooter" checked /></div>
+            <div class="row switch"><div><div>Remover assinatura final (modo agressivo)</div><div class="small">Só quando solicitado pelo modo ou pela opção</div></div><input type="checkbox" id="rmFinalSignature" /></div>
+            <div class="row"><div style="flex:1"><div>Lista branca (nunca remover)</div><div class="small">Separe por vírgulas. Ex.: Defensoria Pública, Ministério Público, Procuradoria</div></div></div>
+            <div class="row" style="border-bottom:0"><input id="whitelist" placeholder="Defensoria Pública, Ministério Público, Procuradoria" style="width:100%; background:#0f1320; border:1px solid rgba(255,255,255,.1); border-radius:8px; padding:10px; color:var(--fg)" /></div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Direita -->
+      <div class="stack sticky">
+        <section class="card"><div class="card__head"><div class="card__title">Pré-visualização</div></div><div class="card__body"><textarea id="output" placeholder="O texto do PDF aparecerá aqui após o processamento..."></textarea></div></section>
+        <section id="diagWrap" class="card" style="display:none"><div class="card__head"><div class="card__title">Diagnóstico / Itens Removidos</div><div class="small" id="stats"></div></div><div class="card__body"><div class="diag" id="removedPreview">—</div></div></section>
+      </div>
+    </div>
+
+    <footer>100% offline. Se o navegador bloquear <code>file://</code>, use <strong>start_local_server.ps1</strong> (servidor local).</footer>
+  </div>
+
+  <!-- Bibliotecas locais (baixadas por setup_offline.ps1) -->
+  <script src="vendor/pdfjs/pdf.min.js"></script>
+  <script> if(window['pdfjsLib']){ pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdfjs/pdf.worker.min.js'; } </script>
+  <script src="vendor/filesaver/FileSaver.min.js"></script>
+  <!-- Carregamos docx como módulo ES e expomos em window.docx -->
+  <script type="module">
+    import * as docxNS from './vendor/docx/index.mjs';
+    window.docx = docxNS;
+  </script>
+
+  <script>
+  const $ = s => document.querySelector(s);
+  const errorBanner = $('#errorBanner');
+  function showError(msg){ errorBanner.textContent = msg; errorBanner.style.display = 'block'; }
+  function hideError(){ errorBanner.style.display = 'none'; }
+
+  // ===== Regex/Utils (igual à hotfix anterior) =====
+  const RE = { hexId:/\b(?:[A-Fa-f0-9]{32,64})\b/g, sha:/\bSHA[- ]?(?:1|256|512):?\s*[A-Fa-f0-9]{16,}\b/g, md5:/\bMD5:[\s-]*[A-Fa-f0-9]{16,}\b/g, protocolo:/\b(Protocolo|ID|Documento|Validador|Autenticidade|C[óo]digo Verificador)[:\s#-]*[A-Za-z0-9\-\.\/]{6,}\b/gi, selo:/\b(?:Selo|Carimbo|Autenticidade|Valida\w+)\b/gi, pageNum:/\b(?:p(?:á|a)gina|pag\.?|p\.)\s*\d+(?:\s*de\s*\d+)?\b/gi, oab:/\bOAB(?:\/[A-Z]{2})?\s*\d{1,6}(?:-[A-Z])?\b/gi, cnpj:/\b\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}\b/g, cep:/\b\d{5}-\d{3}\b/g, phone:/\(\s*\d{2}\s*\)\s*\d{4,5}-\d{4}\b/g, email:/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, url:/\b(?:https?:\/\/|www\.)[^\s]+/gi, addrKw:/\b(?:Rua|Av\.?|Avenida|Alameda|Largo|Praça|Rodovia|BR-\d+|SP-\d+|CEP|Sala|Conj\.?|CJ|Edifício|Torre|CEP)\b/gi, firmKw:/\b(?:Sociedade de Advogados|Escrit[óo]rio de Advocacia|Advogado(?:a)?s?)\b/gi, deferimento:/\b(?:Nestes termos,? pede deferimento|Termos em que,? pede deferimento)\b/gi, assinaturaKw:/\b(?:Assina eletronicamente|Assinatura|Advogado|OAB|Procurador|Defensor)\b/gi };
+  function resetRegex(){ Object.values(RE).forEach(r=>{ if(r.global) r.lastIndex=0; }); }
+  function norm(s){ return (s||'').replace(/[\t\r]+/g,' ').replace(/\u00A0/g,' ').replace(/\s+/g,' ').trim(); }
+  function hash(s){ s=norm(s).toLowerCase(); let h=5381; for(let i=0;i<s.length;i++){ h=((h<<5)+h)+s.charCodeAt(i);} return (h>>>0).toString(36); }
+
+  const Cleaner = (()=>{ /* (mesma implementação da hotfix anterior) */ return {
+    clean(pages,options={}){ const opts=Object.assign({topBand:0.06,bottomBand:0.10,minRepeat:2,maxBlockLen:4,minSignals:2,removeSingleSignature:false,whitelist:[],pageHeightFallback:1000,removeHeaderFooter:true,mode:'leve'},options||{}); const wl=(opts.whitelist||[]).map(w=>w.trim().toLowerCase()).filter(Boolean); const whitelisted=s=> wl.some(w=> (s||'').toLowerCase().includes(w)); let removed=[]; const toLineObjects=(page)=> Array.isArray(page)? page.map(it=> (typeof it==='string')?({text:it}):it) : (page&&Array.isArray(page.lines)? page.lines.map(it=> (typeof it==='string')?({text:it}):it):[]); const pages0=(pages||[]).map(p=>({lines:toLineObjects(p)})); const pages1=pages0.map(pg=>({ lines: pg.lines.filter(l=>{ let t=l.text||''; if(whitelisted(t)) return true; if(window.UIFlags.rmHash && (RE.hexId.test(t)||RE.sha.test(t)||RE.md5.test(t))){ resetRegex(); removed.push({p:null,i:null,len:1,text:t,reason:'hash'}); return false;} resetRegex(); if(window.UIFlags.rmAssinaturaDigital && (RE.selo.test(t)||/ICP-?Brasil/i.test(t))){ resetRegex(); removed.push({p:null,i:null,len:1,text:t,reason:'assinatura-digital'}); return false;} if(window.UIFlags.rmProtocolos && RE.protocolo.test(t)){ resetRegex(); removed.push({p:null,i:null,len:1,text:t,reason:'protocolo'}); return false;} if(window.UIFlags.rmPagenum && RE.pageNum.test(t)){ resetRegex(); removed.push({p:null,i:null,len:1,text:t,reason:'page-number'}); return false;} resetRegex(); return true; }) })); function isTopBottom(line, idx, total){ const y=(typeof line.y==='number')?line.y:null; const ph=(typeof line.pageHeight==='number'&&line.pageHeight>0)?line.pageHeight:opts.pageHeightFallback; let inTop=false,inBottom=false; if(y!==null){ const rel=y/ph; inTop=(rel<=opts.topBand)||(1-rel<=opts.topBand); inBottom=(rel>=1-opts.bottomBand)||(1-rel>=1-opts.bottomBand);} else { inTop=(idx<Math.max(2,Math.ceil(total*opts.topBand))); inBottom=(idx>=total-Math.max(2,Math.ceil(total*opts.bottomBand))); } return {inTop,inBottom}; } function countSignals(s){ let c=0; if(RE.oab.test(s)) c++; if(RE.cnpj.test(s)) c++; if(RE.cep.test(s)) c++; if(RE.phone.test(s)) c++; if(RE.email.test(s)) c++; if(RE.url.test(s)) c++; if(RE.addrKw.test(s)) c++; if(RE.firmKw.test(s)) c++; resetRegex(); return c; } const blocks=new Map(),samples=new Map(); const candidates=pages1.map(pg=>{ const hits=[]; const tot=pg.lines.length; for(let i=0;i<tot;i++){ const ln=pg.lines[i]; const txt=ln.text||''; const pos=isTopBottom(ln,i,tot); const sigs=countSignals(txt); const pageNum=RE.pageNum.test(txt); resetRegex(); const likely=(pos.inTop||pos.inBottom)&&(sigs>=opts.minSignals||pageNum); if(likely) hits.push(i);} return hits; }); pages1.forEach((pg,idx)=>{ const idxs=candidates[idx].sort((a,b)=>a-b); for(let i=0;i<idxs.length;i++){ for(let len=1; len<=Math.min(opts.maxBlockLen, idxs.length-i); len++){ const start=idxs[i]; const seq=idxs.slice(i,i+len); if(seq[seq.length-1]-seq[0]!==len-1) break; const text=pg.lines.slice(start,start+len).map(x=>x.text||'').join('\n'); const key=pg.lines.slice(start,start+len).map(x=>hash(x.text||'')).join('|'); const k=`${len}|${key}`; blocks.set(k,(blocks.get(k)||0)+1); if(!samples.has(k)) samples.set(k,text);} } }); const repeated=[]; for(const [k,c] of blocks){ if(c>=opts.minRepeat){ const sample=samples.get(k); if(countSignals(sample)>=opts.minSignals){ repeated.push({key:k,count:c,sample}); } } } function removeRepeated(pagesLines){ return pagesLines.map((pg,pidx)=>{ const out=[]; for(let i=0;i<pg.lines.length;i++){ let cut=false; for(const blk of repeated){ const len=parseInt(blk.key.split('|')[0],10); const slice=pg.lines.slice(i,i+len).map(x=>x.text||'').join('\n'); if(hash(slice)===hash(blk.sample)){ removed.push({p:pidx+1,i,len,text:slice,reason:'repeated+signals'}); i+=len-1; cut=true; break; } } if(!cut) out.push(pg.lines[i]); } return {lines:out}; }); } const pages2 = opts.removeHeaderFooter? removeRepeated(pages1): pages1; function detectSignatureBlocks(pagesLines){ const allow=[]; const lastIdx=pagesLines.length-1; if(lastIdx>=0){ const last=pagesLines[lastIdx]; const L=last.lines.length; const start=Math.max(0,L-12); const end=L; for(let i=end-1;i>=start;i--){ const t=(last.lines[i].text||''); if(RE.oab.test(t)||RE.assinaturaKw.test(t)){ allow.push({p:lastIdx,from:Math.max(0,i-5),to:Math.min(L,i+3)}); break; } resetRegex(); } } const half=Math.ceil(pagesLines.length/2); for(let p=0;p<half;p++){ const pg=pagesLines[p]; for(let i=0;i<pg.lines.length;i++){ const t=(pg.lines[i].text||''); if(RE.deferimento.test(t)||RE.assinaturaKw.test(t)){ allow.push({p,from:Math.max(0,i-5),to:Math.min(pg.lines.length,i+6)}); break; } resetRegex(); } } return allow; } const allow=detectSignatureBlocks(pages2); function isAllowed(idx,pIdx){ return allow.some(r=> r.p===pIdx && idx>=r.from && idx<r.to); } function removeOABOutsideSignature(pagesLines){ return pagesLines.map((pg,pidx)=>{ const out=[]; for(let i=0;i<pg.lines.length;i++){ const t=pg.lines[i].text||''; const hasOAB=RE.oab.test(t)||/\bAdvogado(?:a)?\b/i.test(t); resetRegex(); if(hasOAB && !isAllowed(i,pidx)){ removed.push({p:pidx+1,i,len:1,text:t,reason:'oab-outside-signature'}); continue; } out.push(pg.lines[i]); } return {lines:out}; }); } const pages3=removeOABOutsideSignature(pages2); const pages4=window.UIFlags.normalizeBreaks? pages3.map(pg=>({lines:pg.lines.map(l=>({text:(l.text||'').replace(/[\u00AD]/g,'').replace(/\s+\n/g,'\n')}))})):pages3; const stats={pages:pages.length,removed:removed.length,allowRanges:allow.length}; return { pages:pages4, removedBlocks:removed, stats }; }, joinPages(pagesLines){ return (pagesLines||[]).map(p=>p.lines.map(l=>l.text||'').join('\n')).join('\n\n'); }
+  }} )();
+
+  // ===== Extração (PDF.js / TXT) =====
+  function looksLikePDF(name){ return /\.pdf$/i.test(name||''); }
+  async function extractFromPDF(file){
+    if(!window['pdfjsLib']) throw new Error('PDF.js não carregado (vendor ausente). Rode setup_offline.ps1');
+    try{
+      const pdfjsLib=window['pdfjsLib'];
+      const buf=await file.arrayBuffer();
+      const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+      const pages=[];
+      for(let p=1;p<=pdf.numPages;p++){
+        const page=await pdf.getPage(p);
+        const viewport=page.getViewport({scale:1});
+        const txt=await page.getTextContent();
+        const items=txt.items||[];
+        const linesMap=new Map();
+        for(const it of items){ const s=it.str||''; const tr=it.transform||[1,0,0,1,0,0]; const x=tr[4], y=tr[5]; const key=Math.round(y); if(!linesMap.has(key)) linesMap.set(key,[]); linesMap.get(key).push({text:s,x,y,pageHeight:viewport.height}); }
+        const lineKeys=Array.from(linesMap.keys()).sort((a,b)=>a-b);
+        const lines=[]; for(const k of lineKeys){ const arr=linesMap.get(k).sort((a,b)=>a.x-b.x); const text=arr.map(o=>o.text).join(' '); lines.push({text,y:arr[0].y,x:arr[0].x,pageHeight:viewport.height}); }
+        const asc=lines.slice().sort((a,b)=>a.y-b.y); const desc=lines.slice().sort((a,b)=>b.y-a.y); const chosen=(asc.length>1 && Math.abs(asc[0].y-asc[asc.length-1].y) > Math.abs(desc[0].y-desc[desc.length-1].y)) ? asc : desc;
+        pages.push({lines:chosen});
+      }
+      return pages;
+    }catch(e){ showError('Falha ao processar PDF. Se abriu via file:// e o navegador bloqueou o worker do PDF.js, rode start_local_server.ps1 e acesse http://localhost:5500.'); throw e; }
+  }
+  async function extractFromTXT(file){ const text=await file.text(); const pagesRaw=text.split(/\n\s*\n/); return pagesRaw.map(pg=>({lines:pg.split(/\n/).map(t=>({text:t}))})); }
+
+  // ===== UI =====
+  window.UIFlags={ rmHash:true, rmAssinaturaDigital:true, rmProtocolos:true, rmSelos:true, ignoreSide:true, rmPagenum:true, normalizeBreaks:true };
+  const pdfInput=$('#pdfFile'), fileName=$('#fileName'), processBtn=$('#processBtn'), downloadTxtBtn=$('#downloadTxtBtn'), downloadDocxBtn=$('#downloadDocxBtn'), previewRemovedBtn=$('#previewRemovedBtn'), output=$('#output'), diagWrap=$('#diagWrap'), removedPreview=$('#removedPreview'), statsBox=$('#stats');
+  $('#rmHash').addEventListener('change',e=>UIFlags.rmHash=e.target.checked);
+  $('#rmAssinaturaDigital').addEventListener('change',e=>UIFlags.rmAssinaturaDigital=e.target.checked);
+  $('#rmProtocolos').addEventListener('change',e=>UIFlags.rmProtocolos=e.target.checked);
+  $('#rmSelos').addEventListener('change',e=>UIFlags.rmSelos=e.target.checked);
+  $('#rmPagenum').addEventListener('change',e=>UIFlags.rmPagenum=e.target.checked);
+  $('#normalizeBreaks').addEventListener('change',e=>UIFlags.normalizeBreaks=e.target.checked);
+  $('#sideWidth').addEventListener('input',e=>$('#sideWidthVal').textContent=e.target.value);
+  function getMode(){ return document.querySelector('input[name="mode"]:checked').value; }
+  function getWhitelist(){ return ($('#whitelist').value||'').split(',').map(s=>s.trim()).filter(Boolean); }
+  let last=null;
+  pdfInput.addEventListener('change',()=>{ fileName.textContent=pdfInput.files?.[0]?.name||'Nenhum arquivo selecionado'; hideError(); });
+  previewRemovedBtn.addEventListener('click',()=>{ diagWrap.style.display=(diagWrap.style.display==='none'||!diagWrap.style.display)?'block':'none'; });
+
+  processBtn.addEventListener('click', async ()=>{
+    const file=pdfInput.files?.[0]; if(!file){ alert('Selecione um arquivo.'); return; }
+    processBtn.disabled=true; processBtn.textContent='Processando…'; hideError();
+    try{
+      const isPdf = looksLikePDF(file.name) || file.type==='application/pdf';
+      const pages = isPdf ? await extractFromPDF(file) : await extractFromTXT(file);
+      const mode=getMode(); const base={ removeHeaderFooter: $('#rmHeaderFooter').checked, whitelist: getWhitelist() }; let opts={...base};
+      if(mode==='leve') opts=Object.assign(opts,{mode:'leve',topBand:0.05,bottomBand:0.08,minRepeat:3,minSignals:2,removeSingleSignature:false});
+      else if(mode==='moderado') opts=Object.assign(opts,{mode:'moderado',topBand:0.06,bottomBand:0.12,minRepeat:2,minSignals:2,removeSingleSignature: $('#rmFinalSignature').checked});
+      else opts=Object.assign(opts,{mode:'agressivo',topBand:0.08,bottomBand:0.18,minRepeat:2,minSignals:2,removeSingleSignature:true});
+      const { pages:cleaned, removedBlocks, stats } = Cleaner.clean(pages, opts);
+      const finalText = Cleaner.joinPages(cleaned);
+      output.value=finalText; last={finalText,removedBlocks,stats};
+      statsBox.textContent=`Páginas: ${stats.pages} · Removidos: ${stats.removed} · Assinaturas preservadas: ${stats.allowRanges}`;
+      removedPreview.textContent=removedBlocks.map(r=>`[p.${r.p??'?'} i:${r.i??'?'}] (${r.reason})\n${r.text}\n---`).join('\n');
+      diagWrap.style.display='block'; downloadTxtBtn.disabled=false; downloadDocxBtn.disabled=false;
+    }catch(err){ console.error(err); showError('Falha ao processar. Garanta que as bibliotecas estão em ./vendor (rode setup_offline.ps1). Se abriu por file:// e o navegador bloqueia worker, use start_local_server.ps1.'); }
+    finally{ processBtn.disabled=false; processBtn.textContent='Processar'; }
+  });
+
+  // Exportar TXT
+  downloadTxtBtn.addEventListener('click',()=>{ if(!last) return; const blob=new Blob([last.finalText],{type:'text/plain;charset=utf-8'}); saveAs(blob,'texto_extraido.txt'); });
+  // Exportar DOCX (usa window.docx exposto via módulo)
+  downloadDocxBtn.addEventListener('click', async ()=>{
+    if(!last) return; const { Document,Packer,Paragraph,TextRun } = window.docx||{}; if(!Document){ showError('docx não carregado. Rode setup_offline.ps1'); return; }
+    const blocks=last.finalText.split(/\n\n+/).map(b=>b.trim()).filter(Boolean); const paras=[];
+    for(const b of blocks){ const lines=b.split(/\n/); const runs=[]; for(let i=0;i<lines.length;i++){ runs.push(new TextRun({text:lines[i],font:'Century Gothic',size:24})); if(i<lines.length-1) runs.push(new TextRun({text:'\n',font:'Century Gothic',size:24})); } paras.push(new Paragraph({children:runs})); }
+    const doc=new Document({ sections:[{children:paras}] }); const blob=await Packer.toBlob(doc); saveAs(blob,'texto_extraido.docx');
+  });
+  </script>
+</body>
+</html>
