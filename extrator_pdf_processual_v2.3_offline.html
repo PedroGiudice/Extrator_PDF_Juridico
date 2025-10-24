@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Extrator de Texto Processual — v2.3 (Offline, hotfix 2)</title>
+  <title>Extrator de Texto Processual — v2.4 (Melhorado)</title>
   <style>
     :root{ --bg:#0b0d12; --panel:#121723; --muted:#8892a6; --fg:#e6e9ef; --accent:#4cc9f0; --warning:#f7b267; --danger:#ff6b6b; --ok:#53e2ae; --mono: ui-monospace, Menlo, Consolas, "Cascadia Code", "Fira Code", monospace; --sans: "Century Gothic","Segoe UI",system-ui,-apple-system,Roboto,"Helvetica Neue",Arial,sans-serif; --radius:12px; --shadow:0 10px 30px rgba(0,0,0,.35);} 
     html,body{height:100%}
@@ -41,8 +41,8 @@
 <body>
   <div class="wrap">
     <header>
-      <h1>Extrator de Texto Processual</h1>
-      <h2>Processamento de documentos jurídicos brasileiros</h2>
+      <h1>Extrator de Texto Processual v2.4</h1>
+      <h2>Processamento de documentos jurídicos brasileiros — Melhorado com preservação de formatação e remoção inteligente de assinaturas digitais</h2>
     </header>
 
     <div id="offlineBanner" class="banner">Modo offline pronto. Se o PDF não processar abrindo via <code>file://</code>, use o script <strong>start_local_server.ps1</strong> e acesse <code>http://localhost:5500</code>.</div>
@@ -121,15 +121,348 @@
   function showError(msg){ errorBanner.textContent = msg; errorBanner.style.display = 'block'; }
   function hideError(){ errorBanner.style.display = 'none'; }
 
-  // ===== Regex/Utils (igual à hotfix anterior) =====
-  const RE = { hexId:/\b(?:[A-Fa-f0-9]{32,64})\b/g, sha:/\bSHA[- ]?(?:1|256|512):?\s*[A-Fa-f0-9]{16,}\b/g, md5:/\bMD5:[\s-]*[A-Fa-f0-9]{16,}\b/g, protocolo:/\b(Protocolo|ID|Documento|Validador|Autenticidade|C[óo]digo Verificador)[:\s#-]*[A-Za-z0-9\-\.\/]{6,}\b/gi, selo:/\b(?:Selo|Carimbo|Autenticidade|Valida\w+)\b/gi, pageNum:/\b(?:p(?:á|a)gina|pag\.?|p\.)\s*\d+(?:\s*de\s*\d+)?\b/gi, oab:/\bOAB(?:\/[A-Z]{2})?\s*\d{1,6}(?:-[A-Z])?\b/gi, cnpj:/\b\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}\b/g, cep:/\b\d{5}-\d{3}\b/g, phone:/\(\s*\d{2}\s*\)\s*\d{4,5}-\d{4}\b/g, email:/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, url:/\b(?:https?:\/\/|www\.)[^\s]+/gi, addrKw:/\b(?:Rua|Av\.?|Avenida|Alameda|Largo|Praça|Rodovia|BR-\d+|SP-\d+|CEP|Sala|Conj\.?|CJ|Edifício|Torre|CEP)\b/gi, firmKw:/\b(?:Sociedade de Advogados|Escrit[óo]rio de Advocacia|Advogado(?:a)?s?)\b/gi, deferimento:/\b(?:Nestes termos,? pede deferimento|Termos em que,? pede deferimento)\b/gi, assinaturaKw:/\b(?:Assina eletronicamente|Assinatura|Advogado|OAB|Procurador|Defensor)\b/gi };
+  // ===== Regex/Utils - Versão Melhorada v2.4 =====
+  const RE = {
+    // Hashes e identificadores
+    hexId:/\b(?:[A-Fa-f0-9]{32,64})\b/g,
+    sha:/\bSHA[- ]?(?:1|224|256|384|512):?\s*[A-Fa-f0-9]{16,}\b/gi,
+    md5:/\bMD5:?[\s-]*[A-Fa-f0-9]{16,}\b/gi,
+
+    // Protocolos e validadores
+    protocolo:/\b(Protocolo|ID|Documento|Validador|Autenticidade|C[óo]digo Verificador|C[óo]digo de Verifica[çc][ãa]o)[:\s#-]*[A-Za-z0-9\-\.\/]{6,}\b/gi,
+
+    // Selos e carimbos
+    selo:/\b(?:Selo|Carimbo|Autenticidade|Valida[çc][ãa]o|Valida\w+)\b/gi,
+
+    // Assinaturas digitais ICP-Brasil (MUITO MAIS ABRANGENTE)
+    icpBrasil:/\b(?:ICP-?Brasil|AC-?[A-Z]{2,}|Autoridade Certificadora|Certificado Digital|Cadeia de certifica[çc][ãa]o)\b/gi,
+    assinaturaEletronica:/\b(?:Assinado (?:eletronicamente|digitalmente)|Documento assinado (?:eletronicamente|digitalmente)|Assinatura eletr[ôo]nica|Assinatura digital)\b/gi,
+    carimboTempo:/\b(?:Carimbo de tempo|Timestamp|Data\/Hora da assinatura|Assinado em \d{2}\/\d{2}\/\d{4})\b/gi,
+    hashAssinatura:/\b(?:Hash do documento|Resumo criptogr[áa]fico|MessageDigest)\s*[:=]?\s*[A-Fa-f0-9]{32,}\b/gi,
+    certificadoSerial:/\b(?:N[úu]mero de s[ée]rie|Serial Number|N[úu]mero do certificado)[:\s]*[A-Fa-f0-9:]{16,}\b/gi,
+    emissorCertificado:/\b(?:Emissor|Emitido por|Issued by)[:\s]*(?:AC|CN=|O=)[^\n]{5,50}\b/gi,
+    validadeCertificado:/\b(?:V[áa]lido de|V[áa]lido at[ée]|Validade)[:\s]*\d{2}\/\d{2}\/\d{4}/gi,
+
+    // Numeração de páginas
+    pageNum:/\b(?:p(?:á|a)gina|pag\.?|p\.)\s*\d+(?:\s*de\s*\d+)?\b/gi,
+
+    // Dados de identificação
+    oab:/\bOAB(?:\/[A-Z]{2})?\s*[Nn]?[ºo°]?\s*\d{1,6}(?:[-\/][A-Z])?\b/gi,
+    cnpj:/\b\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}\b/g,
+    cep:/\b\d{5}-\d{3}\b/g,
+    phone:/\(\s*\d{2}\s*\)\s*\d{4,5}-\d{4}\b/g,
+    email:/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g,
+    url:/\b(?:https?:\/\/|www\.)[^\s]+/gi,
+
+    // Endereços e escritórios
+    addrKw:/\b(?:Rua|Av\.?|Avenida|Alameda|Largo|Pra[çc]a|Rodovia|BR-\d+|SP-\d+|CEP|Sala|Conj\.?|CJ|Edif[íi]cio|Torre)\b/gi,
+    firmKw:/\b(?:Sociedade de Advogados|Escrit[óo]rio de Advocacia|Advogado(?:a)?s?)\b/gi,
+
+    // Expressões jurídicas de encerramento
+    deferimento:/\b(?:Nestes termos,? pede deferimento|Termos em que,? pede deferimento)\b/gi,
+    assinaturaKw:/\b(?:Assina eletronicamente|Assinatura|Advogado|OAB|Procurador|Defensor)\b/gi
+  };
+
   function resetRegex(){ Object.values(RE).forEach(r=>{ if(r.global) r.lastIndex=0; }); }
   function norm(s){ return (s||'').replace(/[\t\r]+/g,' ').replace(/\u00A0/g,' ').replace(/\s+/g,' ').trim(); }
   function hash(s){ s=norm(s).toLowerCase(); let h=5381; for(let i=0;i<s.length;i++){ h=((h<<5)+h)+s.charCodeAt(i);} return (h>>>0).toString(36); }
 
-  const Cleaner = (()=>{ /* (mesma implementação da hotfix anterior) */ return {
-    clean(pages,options={}){ const opts=Object.assign({topBand:0.06,bottomBand:0.10,minRepeat:2,maxBlockLen:4,minSignals:2,removeSingleSignature:false,whitelist:[],pageHeightFallback:1000,removeHeaderFooter:true,mode:'leve'},options||{}); const wl=(opts.whitelist||[]).map(w=>w.trim().toLowerCase()).filter(Boolean); const whitelisted=s=> wl.some(w=> (s||'').toLowerCase().includes(w)); let removed=[]; const toLineObjects=(page)=> Array.isArray(page)? page.map(it=> (typeof it==='string')?({text:it}):it) : (page&&Array.isArray(page.lines)? page.lines.map(it=> (typeof it==='string')?({text:it}):it):[]); const pages0=(pages||[]).map(p=>({lines:toLineObjects(p)})); const pages1=pages0.map(pg=>({ lines: pg.lines.filter(l=>{ let t=l.text||''; if(whitelisted(t)) return true; if(window.UIFlags.rmHash && (RE.hexId.test(t)||RE.sha.test(t)||RE.md5.test(t))){ resetRegex(); removed.push({p:null,i:null,len:1,text:t,reason:'hash'}); return false;} resetRegex(); if(window.UIFlags.rmAssinaturaDigital && (RE.selo.test(t)||/ICP-?Brasil/i.test(t))){ resetRegex(); removed.push({p:null,i:null,len:1,text:t,reason:'assinatura-digital'}); return false;} if(window.UIFlags.rmProtocolos && RE.protocolo.test(t)){ resetRegex(); removed.push({p:null,i:null,len:1,text:t,reason:'protocolo'}); return false;} if(window.UIFlags.rmPagenum && RE.pageNum.test(t)){ resetRegex(); removed.push({p:null,i:null,len:1,text:t,reason:'page-number'}); return false;} resetRegex(); return true; }) })); function isTopBottom(line, idx, total){ const y=(typeof line.y==='number')?line.y:null; const ph=(typeof line.pageHeight==='number'&&line.pageHeight>0)?line.pageHeight:opts.pageHeightFallback; let inTop=false,inBottom=false; if(y!==null){ const rel=y/ph; inTop=(rel<=opts.topBand)||(1-rel<=opts.topBand); inBottom=(rel>=1-opts.bottomBand)||(1-rel>=1-opts.bottomBand);} else { inTop=(idx<Math.max(2,Math.ceil(total*opts.topBand))); inBottom=(idx>=total-Math.max(2,Math.ceil(total*opts.bottomBand))); } return {inTop,inBottom}; } function countSignals(s){ let c=0; if(RE.oab.test(s)) c++; if(RE.cnpj.test(s)) c++; if(RE.cep.test(s)) c++; if(RE.phone.test(s)) c++; if(RE.email.test(s)) c++; if(RE.url.test(s)) c++; if(RE.addrKw.test(s)) c++; if(RE.firmKw.test(s)) c++; resetRegex(); return c; } const blocks=new Map(),samples=new Map(); const candidates=pages1.map(pg=>{ const hits=[]; const tot=pg.lines.length; for(let i=0;i<tot;i++){ const ln=pg.lines[i]; const txt=ln.text||''; const pos=isTopBottom(ln,i,tot); const sigs=countSignals(txt); const pageNum=RE.pageNum.test(txt); resetRegex(); const likely=(pos.inTop||pos.inBottom)&&(sigs>=opts.minSignals||pageNum); if(likely) hits.push(i);} return hits; }); pages1.forEach((pg,idx)=>{ const idxs=candidates[idx].sort((a,b)=>a-b); for(let i=0;i<idxs.length;i++){ for(let len=1; len<=Math.min(opts.maxBlockLen, idxs.length-i); len++){ const start=idxs[i]; const seq=idxs.slice(i,i+len); if(seq[seq.length-1]-seq[0]!==len-1) break; const text=pg.lines.slice(start,start+len).map(x=>x.text||'').join('\n'); const key=pg.lines.slice(start,start+len).map(x=>hash(x.text||'')).join('|'); const k=`${len}|${key}`; blocks.set(k,(blocks.get(k)||0)+1); if(!samples.has(k)) samples.set(k,text);} } }); const repeated=[]; for(const [k,c] of blocks){ if(c>=opts.minRepeat){ const sample=samples.get(k); if(countSignals(sample)>=opts.minSignals){ repeated.push({key:k,count:c,sample}); } } } function removeRepeated(pagesLines){ return pagesLines.map((pg,pidx)=>{ const out=[]; for(let i=0;i<pg.lines.length;i++){ let cut=false; for(const blk of repeated){ const len=parseInt(blk.key.split('|')[0],10); const slice=pg.lines.slice(i,i+len).map(x=>x.text||'').join('\n'); if(hash(slice)===hash(blk.sample)){ removed.push({p:pidx+1,i,len,text:slice,reason:'repeated+signals'}); i+=len-1; cut=true; break; } } if(!cut) out.push(pg.lines[i]); } return {lines:out}; }); } const pages2 = opts.removeHeaderFooter? removeRepeated(pages1): pages1; function detectSignatureBlocks(pagesLines){ const allow=[]; const lastIdx=pagesLines.length-1; if(lastIdx>=0){ const last=pagesLines[lastIdx]; const L=last.lines.length; const start=Math.max(0,L-12); const end=L; for(let i=end-1;i>=start;i--){ const t=(last.lines[i].text||''); if(RE.oab.test(t)||RE.assinaturaKw.test(t)){ allow.push({p:lastIdx,from:Math.max(0,i-5),to:Math.min(L,i+3)}); break; } resetRegex(); } } const half=Math.ceil(pagesLines.length/2); for(let p=0;p<half;p++){ const pg=pagesLines[p]; for(let i=0;i<pg.lines.length;i++){ const t=(pg.lines[i].text||''); if(RE.deferimento.test(t)||RE.assinaturaKw.test(t)){ allow.push({p,from:Math.max(0,i-5),to:Math.min(pg.lines.length,i+6)}); break; } resetRegex(); } } return allow; } const allow=detectSignatureBlocks(pages2); function isAllowed(idx,pIdx){ return allow.some(r=> r.p===pIdx && idx>=r.from && idx<r.to); } function removeOABOutsideSignature(pagesLines){ return pagesLines.map((pg,pidx)=>{ const out=[]; for(let i=0;i<pg.lines.length;i++){ const t=pg.lines[i].text||''; const hasOAB=RE.oab.test(t)||/\bAdvogado(?:a)?\b/i.test(t); resetRegex(); if(hasOAB && !isAllowed(i,pidx)){ removed.push({p:pidx+1,i,len:1,text:t,reason:'oab-outside-signature'}); continue; } out.push(pg.lines[i]); } return {lines:out}; }); } const pages3=removeOABOutsideSignature(pages2); const pages4=window.UIFlags.normalizeBreaks? pages3.map(pg=>({lines:pg.lines.map(l=>({text:(l.text||'').replace(/[\u00AD]/g,'').replace(/\s+\n/g,'\n')}))})):pages3; const stats={pages:pages.length,removed:removed.length,allowRanges:allow.length}; return { pages:pages4, removedBlocks:removed, stats }; }, joinPages(pagesLines){ return (pagesLines||[]).map(p=>p.lines.map(l=>l.text||'').join('\n')).join('\n\n'); }
-  }} )();
+  // ===== Cleaner - Versão Melhorada v2.4 =====
+  const Cleaner = (()=>{
+    return {
+      clean(pages, options={}){
+        const opts = Object.assign({
+          topBand:0.06, bottomBand:0.10, minRepeat:2, maxBlockLen:4, minSignals:2,
+          removeSingleSignature:false, whitelist:[], pageHeightFallback:1000,
+          removeHeaderFooter:true, mode:'leve'
+        }, options||{});
+
+        const wl = (opts.whitelist||[]).map(w=>w.trim().toLowerCase()).filter(Boolean);
+        const whitelisted = s => wl.some(w => (s||'').toLowerCase().includes(w));
+        let removed = [];
+
+        const toLineObjects = (page) => {
+          if (Array.isArray(page)) return page.map(it => (typeof it==='string') ? {text:it} : it);
+          if (page && Array.isArray(page.lines)) return page.lines.map(it => (typeof it==='string') ? {text:it} : it);
+          return [];
+        };
+
+        const pages0 = (pages||[]).map(p => ({lines: toLineObjects(p)}));
+
+        // ===== FASE 1: Remoção de linhas indesejadas (hashes, assinaturas digitais, etc) =====
+        const pages1 = pages0.map(pg => ({
+          lines: pg.lines.filter(l => {
+            let t = l.text || '';
+
+            // Whitelist tem prioridade
+            if (whitelisted(t)) return true;
+
+            // Remover hashes
+            if (window.UIFlags.rmHash && (RE.hexId.test(t) || RE.sha.test(t) || RE.md5.test(t) || RE.hashAssinatura.test(t))) {
+              resetRegex();
+              removed.push({p:null, i:null, len:1, text:t, reason:'hash'});
+              return false;
+            }
+            resetRegex();
+
+            // SEMPRE remover assinaturas digitais ICP-Brasil (mais abrangente)
+            if (window.UIFlags.rmAssinaturaDigital) {
+              if (RE.selo.test(t) || RE.icpBrasil.test(t) || RE.assinaturaEletronica.test(t) ||
+                  RE.carimboTempo.test(t) || RE.certificadoSerial.test(t) ||
+                  RE.emissorCertificado.test(t) || RE.validadeCertificado.test(t)) {
+                resetRegex();
+                removed.push({p:null, i:null, len:1, text:t, reason:'assinatura-digital'});
+                return false;
+              }
+            }
+            resetRegex();
+
+            // Remover protocolos
+            if (window.UIFlags.rmProtocolos && RE.protocolo.test(t)) {
+              resetRegex();
+              removed.push({p:null, i:null, len:1, text:t, reason:'protocolo'});
+              return false;
+            }
+            resetRegex();
+
+            // Remover numeração de páginas
+            if (window.UIFlags.rmPagenum && RE.pageNum.test(t)) {
+              resetRegex();
+              removed.push({p:null, i:null, len:1, text:t, reason:'page-number'});
+              return false;
+            }
+            resetRegex();
+
+            return true;
+          })
+        }));
+
+        // ===== FASE 2: Detecção de cabeçalho/rodapé repetitivo =====
+        function isTopBottom(line, idx, total) {
+          const y = (typeof line.y === 'number') ? line.y : null;
+          const ph = (typeof line.pageHeight === 'number' && line.pageHeight > 0) ? line.pageHeight : opts.pageHeightFallback;
+          let inTop = false, inBottom = false;
+
+          if (y !== null) {
+            const rel = y / ph;
+            inTop = (rel <= opts.topBand) || (1 - rel <= opts.topBand);
+            inBottom = (rel >= 1 - opts.bottomBand) || (1 - rel >= 1 - opts.bottomBand);
+          } else {
+            inTop = (idx < Math.max(2, Math.ceil(total * opts.topBand)));
+            inBottom = (idx >= total - Math.max(2, Math.ceil(total * opts.bottomBand)));
+          }
+          return {inTop, inBottom};
+        }
+
+        function countSignals(s) {
+          let c = 0;
+          if (RE.oab.test(s)) c++;
+          if (RE.cnpj.test(s)) c++;
+          if (RE.cep.test(s)) c++;
+          if (RE.phone.test(s)) c++;
+          if (RE.email.test(s)) c++;
+          if (RE.url.test(s)) c++;
+          if (RE.addrKw.test(s)) c++;
+          if (RE.firmKw.test(s)) c++;
+          resetRegex();
+          return c;
+        }
+
+        const blocks = new Map(), samples = new Map();
+        const candidates = pages1.map(pg => {
+          const hits = [];
+          const tot = pg.lines.length;
+          for (let i = 0; i < tot; i++) {
+            const ln = pg.lines[i];
+            const txt = ln.text || '';
+            const pos = isTopBottom(ln, i, tot);
+            const sigs = countSignals(txt);
+            const pageNum = RE.pageNum.test(txt);
+            resetRegex();
+            const likely = (pos.inTop || pos.inBottom) && (sigs >= opts.minSignals || pageNum);
+            if (likely) hits.push(i);
+          }
+          return hits;
+        });
+
+        pages1.forEach((pg, idx) => {
+          const idxs = candidates[idx].sort((a,b) => a-b);
+          for (let i = 0; i < idxs.length; i++) {
+            for (let len = 1; len <= Math.min(opts.maxBlockLen, idxs.length - i); len++) {
+              const start = idxs[i];
+              const seq = idxs.slice(i, i + len);
+              if (seq[seq.length-1] - seq[0] !== len - 1) break;
+              const text = pg.lines.slice(start, start + len).map(x => x.text||'').join('\n');
+              const key = pg.lines.slice(start, start + len).map(x => hash(x.text||'')).join('|');
+              const k = `${len}|${key}`;
+              blocks.set(k, (blocks.get(k) || 0) + 1);
+              if (!samples.has(k)) samples.set(k, text);
+            }
+          }
+        });
+
+        const repeated = [];
+        for (const [k, c] of blocks) {
+          if (c >= opts.minRepeat) {
+            const sample = samples.get(k);
+            if (countSignals(sample) >= opts.minSignals) {
+              repeated.push({key: k, count: c, sample});
+            }
+          }
+        }
+
+        function removeRepeated(pagesLines) {
+          return pagesLines.map((pg, pidx) => {
+            const out = [];
+            for (let i = 0; i < pg.lines.length; i++) {
+              let cut = false;
+              for (const blk of repeated) {
+                const len = parseInt(blk.key.split('|')[0], 10);
+                const slice = pg.lines.slice(i, i + len).map(x => x.text||'').join('\n');
+                if (hash(slice) === hash(blk.sample)) {
+                  removed.push({p: pidx+1, i, len, text: slice, reason: 'repeated+signals'});
+                  i += len - 1;
+                  cut = true;
+                  break;
+                }
+              }
+              if (!cut) out.push(pg.lines[i]);
+            }
+            return {lines: out};
+          });
+        }
+
+        const pages2 = opts.removeHeaderFooter ? removeRepeated(pages1) : pages1;
+
+        // ===== FASE 3: Detecção de blocos de assinatura válidos (para não remover OAB legítimo) =====
+        function detectSignatureBlocks(pagesLines) {
+          const allow = [];
+          const lastIdx = pagesLines.length - 1;
+
+          // Última página: permitir área de assinatura
+          if (lastIdx >= 0) {
+            const last = pagesLines[lastIdx];
+            const L = last.lines.length;
+            const start = Math.max(0, L - 12);
+            for (let i = L - 1; i >= start; i--) {
+              const t = (last.lines[i].text || '');
+              if (RE.oab.test(t) || RE.assinaturaKw.test(t)) {
+                allow.push({p: lastIdx, from: Math.max(0, i - 5), to: Math.min(L, i + 3)});
+                break;
+              }
+              resetRegex();
+            }
+          }
+
+          // Primeiras páginas: permitir área de "pede deferimento"
+          const half = Math.ceil(pagesLines.length / 2);
+          for (let p = 0; p < half; p++) {
+            const pg = pagesLines[p];
+            for (let i = 0; i < pg.lines.length; i++) {
+              const t = (pg.lines[i].text || '');
+              if (RE.deferimento.test(t) || RE.assinaturaKw.test(t)) {
+                allow.push({p, from: Math.max(0, i - 5), to: Math.min(pg.lines.length, i + 6)});
+                break;
+              }
+              resetRegex();
+            }
+          }
+          return allow;
+        }
+
+        const allow = detectSignatureBlocks(pages2);
+
+        function isAllowed(idx, pIdx) {
+          return allow.some(r => r.p === pIdx && idx >= r.from && idx < r.to);
+        }
+
+        function removeOABOutsideSignature(pagesLines) {
+          return pagesLines.map((pg, pidx) => {
+            const out = [];
+            for (let i = 0; i < pg.lines.length; i++) {
+              const t = pg.lines[i].text || '';
+              const hasOAB = RE.oab.test(t) || /\bAdvogado(?:a)?\b/i.test(t);
+              resetRegex();
+
+              if (hasOAB && !isAllowed(i, pidx)) {
+                removed.push({p: pidx+1, i, len: 1, text: t, reason: 'oab-outside-signature'});
+                continue;
+              }
+              out.push(pg.lines[i]);
+            }
+            return {lines: out};
+          });
+        }
+
+        const pages3 = removeOABOutsideSignature(pages2);
+
+        // ===== FASE 4: Normalização de quebras =====
+        const pages4 = window.UIFlags.normalizeBreaks ?
+          pages3.map(pg => ({
+            lines: pg.lines.map(l => ({
+              ...l,
+              text: (l.text || '')
+                .replace(/[\u00AD]/g, '')  // soft hyphen
+                .replace(/\s+\n/g, '\n')
+            }))
+          })) : pages3;
+
+        const stats = {
+          pages: pages.length,
+          removed: removed.length,
+          allowRanges: allow.length
+        };
+
+        return {pages: pages4, removedBlocks: removed, stats};
+      },
+
+      // ===== FASE 5: Junção com preservação de parágrafos =====
+      joinPages(pagesLines) {
+        const paragraphs = [];
+
+        for (const page of pagesLines || []) {
+          let currentParagraph = [];
+
+          for (let i = 0; i < page.lines.length; i++) {
+            const line = page.lines[i];
+            const text = (line.text || '').trim();
+
+            if (!text) {
+              // Linha vazia = quebra de parágrafo
+              if (currentParagraph.length > 0) {
+                paragraphs.push(currentParagraph.join(' '));
+                currentParagraph = [];
+              }
+              continue;
+            }
+
+            // Detectar início de novo parágrafo (recuo, numeração, etc)
+            const isNewParagraph =
+              /^\s{2,}/.test(line.text || '') ||  // recuo significativo
+              /^[0-9]+\./.test(text) ||            // numeração (1., 2., etc)
+              /^[A-Z][).]/.test(text) ||           // letras (A., B., etc)
+              /^[IVX]+\./.test(text) ||            // romanos (I., II., etc)
+              /^[-•*]/.test(text);                 // bullets
+
+            if (isNewParagraph && currentParagraph.length > 0) {
+              paragraphs.push(currentParagraph.join(' '));
+              currentParagraph = [];
+            }
+
+            currentParagraph.push(text);
+          }
+
+          // Finalizar parágrafo ao fim da página
+          if (currentParagraph.length > 0) {
+            paragraphs.push(currentParagraph.join(' '));
+            currentParagraph = [];
+          }
+        }
+
+        return paragraphs.join('\n\n');
+      }
+    };
+  })();
 
   // ===== Extração (PDF.js / TXT) =====
   function looksLikePDF(name){ return /\.pdf$/i.test(name||''); }

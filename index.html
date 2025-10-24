@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Extrator PDF Jurídico v2.5</title>
+  <style>
+    /* Reset e Base */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #ffffff;
+      --surface: #f8f8f8;
+      --border: #e0e0e0;
+      --text: #1a1a1a;
+      --text-muted: #666666;
+      --accent: #000000;
+      --hover: #f0f0f0;
+      --mono: 'Courier New', Consolas, Monaco, 'Lucida Console', monospace;
+      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      --radius: 4px;
+      --shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* Header */
+    header {
+      border-bottom: 2px solid var(--accent);
+      padding: 2rem 0 1rem 0;
+      margin-bottom: 2rem;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 0.25rem;
+      text-transform: uppercase;
+    }
+
+    h2 {
+      font-size: 0.75rem;
+      font-weight: 400;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Layout */
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+
+    .grid {
+      display: grid;
+      gap: 2rem;
+      margin-top: 2rem;
+    }
+
+    @media (min-width: 1024px) {
+      .grid { grid-template-columns: 400px 1fr; }
+    }
+
+    /* Cards */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .card-header {
+      background: var(--accent);
+      color: var(--bg);
+      padding: 0.75rem 1rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 2px solid var(--accent);
+    }
+
+    .card-body {
+      padding: 1.5rem;
+    }
+
+    .section {
+      margin-bottom: 1.5rem;
+    }
+
+    .section:last-child {
+      margin-bottom: 0;
+    }
+
+    .section-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    /* Form Elements */
+    label {
+      display: block;
+      font-size: 0.85rem;
+      margin-bottom: 0.5rem;
+      cursor: pointer;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    select, input[type="text"] {
+      width: 100%;
+      padding: 0.65rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bg);
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      transition: border-color 0.2s;
+    }
+
+    select:focus, input[type="text"]:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    select {
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%231a1a1a' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.65rem center;
+      padding-right: 2rem;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-block;
+      padding: 0.65rem 1.25rem;
+      border: 2px solid var(--accent);
+      background: var(--accent);
+      color: var(--bg);
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      border-radius: var(--radius);
+      transition: all 0.2s;
+      text-align: center;
+    }
+
+    .btn:hover:not(:disabled) {
+      background: var(--bg);
+      color: var(--accent);
+    }
+
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .btn-outline {
+      background: var(--bg);
+      color: var(--accent);
+    }
+
+    .btn-outline:hover:not(:disabled) {
+      background: var(--accent);
+      color: var(--bg);
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    /* Checkboxes */
+    .checkbox {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .checkbox:last-child {
+      border-bottom: none;
+    }
+
+    .checkbox label {
+      flex: 1;
+      margin: 0;
+      font-size: 0.85rem;
+    }
+
+    .checkbox input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+      accent-color: var(--accent);
+    }
+
+    .checkbox-description {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    /* Textarea */
+    textarea {
+      width: 100%;
+      min-height: 600px;
+      padding: 1rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bg);
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      line-height: 1.6;
+      resize: vertical;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    /* Stats */
+    .stats {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+      font-size: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    .stats-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.25rem 0;
+    }
+
+    .stats-label {
+      color: var(--text-muted);
+    }
+
+    .stats-value {
+      font-weight: 700;
+    }
+
+    /* File Info */
+    .file-info {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.75rem;
+      font-size: 0.8rem;
+      margin-bottom: 1rem;
+      color: var(--text-muted);
+    }
+
+    .file-name {
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    /* System Badges */
+    .system-selector {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .system-option {
+      position: relative;
+    }
+
+    .system-option input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+    }
+
+    .system-label {
+      display: block;
+      padding: 0.65rem;
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      text-align: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .system-option input[type="radio"]:checked + .system-label {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: var(--bg);
+    }
+
+    .system-label:hover {
+      border-color: var(--accent);
+    }
+
+    /* Footer */
+    footer {
+      margin: 3rem 0 2rem 0;
+      padding-top: 2rem;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Alert */
+    .alert {
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius);
+      margin-bottom: 1rem;
+      font-size: 0.8rem;
+      display: none;
+    }
+
+    .alert.error {
+      background: var(--accent);
+      color: var(--bg);
+      display: block;
+    }
+
+    .alert.info {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      display: block;
+    }
+
+    /* Loading */
+    .loading {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid var(--bg);
+      border-radius: 50%;
+      border-top-color: transparent;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      html, body { font-size: 13px; }
+      .container { padding: 0 1rem; }
+      header { padding: 1.5rem 0 1rem 0; }
+      h1 { font-size: 1.25rem; }
+      .system-selector { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>[ EXTRATOR PDF JURÍDICO v2.5 ]</h1>
+      <h2>Processamento inteligente de petições e documentos processuais</h2>
+    </header>
+
+    <div id="errorBanner" class="alert error"></div>
+
+    <div class="grid">
+      <!-- Painel Esquerdo -->
+      <div>
+        <!-- Upload -->
+        <div class="card">
+          <div class="card-header">[ 01 ] Arquivo PDF</div>
+          <div class="card-body">
+            <div class="section">
+              <div class="file-info" id="fileInfo">
+                <span class="file-name">Nenhum arquivo selecionado</span>
+              </div>
+              <div class="btn-group">
+                <label class="btn btn-outline" for="pdfFile">
+                  Selecionar PDF
+                </label>
+                <input id="pdfFile" type="file" accept="application/pdf,.pdf,.txt" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sistema Processual -->
+        <div class="card" style="margin-top: 1rem;">
+          <div class="card-header">[ 02 ] Sistema Processual</div>
+          <div class="card-body">
+            <div class="section-title">Selecione o sistema de origem</div>
+            <div class="system-selector">
+              <div class="system-option">
+                <input type="radio" name="system" value="auto" id="sys-auto" checked>
+                <label class="system-label" for="sys-auto">AUTO</label>
+              </div>
+              <div class="system-option">
+                <input type="radio" name="system" value="eproc" id="sys-eproc">
+                <label class="system-label" for="sys-eproc">EPROC</label>
+              </div>
+              <div class="system-option">
+                <input type="radio" name="system" value="esaj" id="sys-esaj">
+                <label class="system-label" for="sys-esaj">ESAJ</label>
+              </div>
+              <div class="system-option">
+                <input type="radio" name="system" value="pje" id="sys-pje">
+                <label class="system-label" for="sys-pje">PJE</label>
+              </div>
+              <div class="system-option">
+                <input type="radio" name="system" value="projudi" id="sys-projudi">
+                <label class="system-label" for="sys-projudi">PROJUDI</label>
+              </div>
+              <div class="system-option">
+                <input type="radio" name="system" value="stf" id="sys-stf">
+                <label class="system-label" for="sys-stf">STF</label>
+              </div>
+              <div class="system-option">
+                <input type="radio" name="system" value="stj" id="sys-stj">
+                <label class="system-label" for="sys-stj">STJ</label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Configurações -->
+        <div class="card" style="margin-top: 1rem;">
+          <div class="card-header">[ 03 ] Configurações</div>
+          <div class="card-body">
+            <div class="section">
+              <div class="checkbox">
+                <input type="checkbox" id="rmHash" checked>
+                <label for="rmHash">
+                  Remover hashes e códigos
+                  <div class="checkbox-description">SHA-256, MD5, hexadecimais</div>
+                </label>
+              </div>
+              <div class="checkbox">
+                <input type="checkbox" id="rmAssinatura" checked>
+                <label for="rmAssinatura">
+                  Remover assinaturas digitais
+                  <div class="checkbox-description">ICP-Brasil, certificados, selos</div>
+                </label>
+              </div>
+              <div class="checkbox">
+                <input type="checkbox" id="rmProtocolo" checked>
+                <label for="rmProtocolo">
+                  Remover protocolos
+                  <div class="checkbox-description">Códigos verificadores, autenticidades</div>
+                </label>
+              </div>
+              <div class="checkbox">
+                <input type="checkbox" id="rmPageNum" checked>
+                <label for="rmPageNum">
+                  Remover numeração de páginas
+                  <div class="checkbox-description">Pág. X de Y, etc</div>
+                </label>
+              </div>
+              <div class="checkbox">
+                <input type="checkbox" id="rmHeader" checked>
+                <label for="rmHeader">
+                  Remover cabeçalho/rodapé repetitivo
+                  <div class="checkbox-description">Timbres, endereços, telefones</div>
+                </label>
+              </div>
+            </div>
+
+            <div class="section" style="margin-top: 1.5rem;">
+              <div class="btn-group" style="width: 100%;">
+                <button class="btn" id="processBtn" style="flex: 1;">
+                  Processar
+                </button>
+                <button class="btn btn-outline" id="downloadTxtBtn" disabled style="flex: 1;">
+                  Baixar TXT
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Painel Direito -->
+      <div>
+        <div class="card">
+          <div class="card-header">[ OUTPUT ] Texto Extraído</div>
+          <div class="card-body">
+            <div id="statsBox" class="stats" style="display: none;">
+              <div class="stats-row">
+                <span class="stats-label">Páginas processadas:</span>
+                <span class="stats-value" id="statPages">-</span>
+              </div>
+              <div class="stats-row">
+                <span class="stats-label">Itens removidos:</span>
+                <span class="stats-value" id="statRemoved">-</span>
+              </div>
+              <div class="stats-row">
+                <span class="stats-label">Sistema detectado:</span>
+                <span class="stats-value" id="statSystem">-</span>
+              </div>
+            </div>
+            <textarea id="output" placeholder="O texto extraído aparecerá aqui após o processamento...
+
+> Selecione um arquivo PDF
+> Escolha o sistema processual (ou deixe em AUTO)
+> Clique em PROCESSAR"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      Extrator PDF Jurídico v2.5 — 100% Offline · Open Source
+    </footer>
+  </div>
+
+  <!-- Bibliotecas (CDN para versão web) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.6.347/pdf.min.js"></script>
+  <script>
+    if (window['pdfjsLib']) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.6.347/pdf.worker.min.js';
+    }
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+  <script>
+    const $ = s => document.querySelector(s);
+    const errorBanner = $('#errorBanner');
+
+    function showError(msg) {
+      errorBanner.textContent = '[ ERROR ] ' + msg;
+      errorBanner.style.display = 'block';
+    }
+
+    function hideError() {
+      errorBanner.style.display = 'none';
+    }
+
+    // ===== PADRÕES POR SISTEMA PROCESSUAL =====
+    const SYSTEM_PATTERNS = {
+      eproc: {
+        name: 'E-PROC (TRF)',
+        signatures: [
+          /\bAssinado eletronicamente por[^\n]{0,100}\bem\s+\d{2}\/\d{2}\/\d{4}/gi,
+          /\be-Proc\b/gi,
+          /\bTribunal Regional Federal/gi,
+          /\bVerifique a assinatura digital em[^\n]{0,150}/gi,
+        ]
+      },
+      esaj: {
+        name: 'E-SAJ (TJSP)',
+        signatures: [
+          /\bE-SAJ\b/gi,
+          /\bTribunal de Justi[çc]a do Estado de S[ãa]o Paulo/gi,
+          /\bForo (?:Central|Regional)[^\n]{0,100}/gi,
+          /\bAssinado digitalmente[^\n]{0,100}e-SAJ/gi,
+          /\bC[óo]digo para valida[çc][ãa]o[:\s]*[A-Z0-9]{10,}/gi,
+        ]
+      },
+      pje: {
+        name: 'PJE (CNJ)',
+        signatures: [
+          /\bPJe\b/gi,
+          /\bProcesso Judicial Eletr[ôo]nico/gi,
+          /\bAssinado eletronicamente por[^\n]{0,100}PJe/gi,
+          /\bC[óo]digo Verificador[:\s]*[A-Z0-9]{8,}/gi,
+          /\bAssinatura digital conforme[^\n]{0,100}PJe/gi,
+        ]
+      },
+      projudi: {
+        name: 'PROJUDI',
+        signatures: [
+          /\bPROJUDI\b/gi,
+          /\bSistema de Processo Judicial Digital/gi,
+          /\bAssinado digitalmente[^\n]{0,100}PROJUDI/gi,
+        ]
+      },
+      stf: {
+        name: 'STF',
+        signatures: [
+          /\bSupremo Tribunal Federal\b/gi,
+          /\bSTF\b/g,
+          /\bPra[çc]a dos Tr[êe]s Poderes/gi,
+          /\bAssinado digitalmente[^\n]{0,100}STF/gi,
+        ]
+      },
+      stj: {
+        name: 'STJ',
+        signatures: [
+          /\bSuperior Tribunal de Justi[çc]a\b/gi,
+          /\bSTJ\b/g,
+          /\bAssinado digitalmente[^\n]{0,100}STJ/gi,
+        ]
+      }
+    };
+
+    // ===== REGEX UNIVERSAIS (v2.4) =====
+    const RE = {
+      // Hashes
+      hexId: /\b(?:[A-Fa-f0-9]{32,64})\b/g,
+      sha: /\bSHA[- ]?(?:1|224|256|384|512):?\s*[A-Fa-f0-9]{16,}\b/gi,
+      md5: /\bMD5:?[\s-]*[A-Fa-f0-9]{16,}\b/gi,
+
+      // Protocolos
+      protocolo: /\b(Protocolo|ID|Documento|Validador|Autenticidade|C[óo]digo Verificador|C[óo]digo de Verifica[çc][ãa]o)[:\s#-]*[A-Za-z0-9\-\.\/]{6,}\b/gi,
+
+      // Assinaturas digitais ICP-Brasil
+      icpBrasil: /\b(?:ICP-?Brasil|AC-?[A-Z]{2,}|Autoridade Certificadora|Certificado Digital|Cadeia de certifica[çc][ãa]o)\b/gi,
+      assinaturaEletronica: /\b(?:Assinado (?:eletronicamente|digitalmente)|Documento assinado (?:eletronicamente|digitalmente)|Assinatura eletr[ôo]nica|Assinatura digital)\b/gi,
+      carimboTempo: /\b(?:Carimbo de tempo|Timestamp|Data\/Hora da assinatura|Assinado em \d{2}\/\d{2}\/\d{4})\b/gi,
+      hashAssinatura: /\b(?:Hash do documento|Resumo criptogr[áa]fico|MessageDigest)\s*[:=]?\s*[A-Fa-f0-9]{32,}\b/gi,
+      certificadoSerial: /\b(?:N[úu]mero de s[ée]rie|Serial Number|N[úu]mero do certificado)[:\s]*[A-Fa-f0-9:]{16,}\b/gi,
+      emissorCertificado: /\b(?:Emissor|Emitido por|Issued by)[:\s]*(?:AC|CN=|O=)[^\n]{5,50}\b/gi,
+      validadeCertificado: /\b(?:V[áa]lido de|V[áa]lido at[ée]|Validade)[:\s]*\d{2}\/\d{2}\/\d{4}/gi,
+      selo: /\b(?:Selo|Carimbo|Autenticidade|Valida[çc][ãa]o|Valida\w+)\b/gi,
+
+      // Outros
+      pageNum: /\b(?:p(?:á|a)gina|pag\.?|p\.)\s*\d+(?:\s*de\s*\d+)?\b/gi,
+      oab: /\bOAB(?:\/[A-Z]{2})?\s*[Nn]?[ºo°]?\s*\d{1,6}(?:[-\/][A-Z])?\b/gi,
+      deferimento: /\b(?:Nestes termos,? pede deferimento|Termos em que,? pede deferimento)\b/gi,
+      assinaturaKw: /\b(?:Assina eletronicamente|Assinatura|Advogado|OAB|Procurador|Defensor)\b/gi,
+    };
+
+    function resetRegex() {
+      Object.values(RE).forEach(r => { if (r.global) r.lastIndex = 0; });
+    }
+
+    function getSelectedSystem() {
+      const radio = document.querySelector('input[name="system"]:checked');
+      return radio ? radio.value : 'auto';
+    }
+
+    function detectSystem(text) {
+      const scores = {};
+
+      for (const [key, config] of Object.entries(SYSTEM_PATTERNS)) {
+        let score = 0;
+        for (const pattern of config.signatures) {
+          const matches = text.match(pattern);
+          if (matches) score += matches.length;
+        }
+        scores[key] = score;
+      }
+
+      const detected = Object.entries(scores)
+        .sort((a, b) => b[1] - a[1])
+        .filter(([_, score]) => score > 0)[0];
+
+      return detected ? detected[0] : 'auto';
+    }
+
+    // ===== CLEANER =====
+    const Cleaner = {
+      clean(pages, options = {}) {
+        const opts = Object.assign({
+          system: 'auto',
+          removeHash: true,
+          removeSignature: true,
+          removeProtocol: true,
+          removePageNum: true,
+          removeHeader: true,
+        }, options);
+
+        let removed = [];
+        const systemPatterns = opts.system !== 'auto' && SYSTEM_PATTERNS[opts.system]
+          ? SYSTEM_PATTERNS[opts.system].signatures
+          : [];
+
+        // Converter páginas em linhas
+        const pagesLines = pages.map(p => ({
+          lines: Array.isArray(p.lines) ? p.lines : []
+        }));
+
+        // FASE 1: Filtrar linhas indesejadas
+        const cleaned = pagesLines.map(pg => ({
+          lines: pg.lines.filter(line => {
+            const t = line.text || '';
+
+            // Testar padrões específicos do sistema
+            if (opts.removeSignature && systemPatterns.length > 0) {
+              for (const pattern of systemPatterns) {
+                if (pattern.test(t)) {
+                  resetRegex();
+                  removed.push({ text: t, reason: `signature-${opts.system}` });
+                  return false;
+                }
+                resetRegex();
+              }
+            }
+
+            // Hashes
+            if (opts.removeHash && (RE.hexId.test(t) || RE.sha.test(t) || RE.md5.test(t) || RE.hashAssinatura.test(t))) {
+              resetRegex();
+              removed.push({ text: t, reason: 'hash' });
+              return false;
+            }
+            resetRegex();
+
+            // Assinaturas digitais gerais
+            if (opts.removeSignature) {
+              if (RE.icpBrasil.test(t) || RE.assinaturaEletronica.test(t) ||
+                  RE.carimboTempo.test(t) || RE.certificadoSerial.test(t) ||
+                  RE.emissorCertificado.test(t) || RE.validadeCertificado.test(t) || RE.selo.test(t)) {
+                resetRegex();
+                removed.push({ text: t, reason: 'signature-general' });
+                return false;
+              }
+            }
+            resetRegex();
+
+            // Protocolos
+            if (opts.removeProtocol && RE.protocolo.test(t)) {
+              resetRegex();
+              removed.push({ text: t, reason: 'protocol' });
+              return false;
+            }
+            resetRegex();
+
+            // Paginação
+            if (opts.removePageNum && RE.pageNum.test(t)) {
+              resetRegex();
+              removed.push({ text: t, reason: 'page-number' });
+              return false;
+            }
+            resetRegex();
+
+            return true;
+          })
+        }));
+
+        // FASE 2: Junção com preservação de parágrafos
+        const paragraphs = [];
+        for (const page of cleaned) {
+          let currentParagraph = [];
+
+          for (let i = 0; i < page.lines.length; i++) {
+            const line = page.lines[i];
+            const text = (line.text || '').trim();
+
+            if (!text) {
+              if (currentParagraph.length > 0) {
+                paragraphs.push(currentParagraph.join(' '));
+                currentParagraph = [];
+              }
+              continue;
+            }
+
+            const isNewParagraph =
+              /^\s{2,}/.test(line.text || '') ||
+              /^[0-9]+\./.test(text) ||
+              /^[A-Z][).]/.test(text) ||
+              /^[IVX]+\./.test(text) ||
+              /^[-•*]/.test(text);
+
+            if (isNewParagraph && currentParagraph.length > 0) {
+              paragraphs.push(currentParagraph.join(' '));
+              currentParagraph = [];
+            }
+
+            currentParagraph.push(text);
+          }
+
+          if (currentParagraph.length > 0) {
+            paragraphs.push(currentParagraph.join(' '));
+          }
+        }
+
+        return {
+          text: paragraphs.join('\n\n'),
+          stats: {
+            pages: pages.length,
+            removed: removed.length,
+          }
+        };
+      }
+    };
+
+    // ===== EXTRAÇÃO PDF =====
+    async function extractFromPDF(file) {
+      if (!window['pdfjsLib']) throw new Error('PDF.js não carregado');
+
+      const pdfjsLib = window['pdfjsLib'];
+      const buf = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+      const pages = [];
+
+      for (let p = 1; p <= pdf.numPages; p++) {
+        const page = await pdf.getPage(p);
+        const viewport = page.getViewport({ scale: 1 });
+        const txt = await page.getTextContent();
+        const items = txt.items || [];
+
+        const linesMap = new Map();
+        for (const it of items) {
+          const s = it.str || '';
+          const tr = it.transform || [1, 0, 0, 1, 0, 0];
+          const x = tr[4], y = tr[5];
+          const key = Math.round(y);
+
+          if (!linesMap.has(key)) linesMap.set(key, []);
+          linesMap.get(key).push({ text: s, x, y, pageHeight: viewport.height });
+        }
+
+        const lineKeys = Array.from(linesMap.keys()).sort((a, b) => b - a);
+        const lines = [];
+
+        for (const k of lineKeys) {
+          const arr = linesMap.get(k).sort((a, b) => a.x - b.x);
+          const text = arr.map(o => o.text).join(' ');
+          lines.push({ text, y: arr[0].y, x: arr[0].x, pageHeight: viewport.height });
+        }
+
+        pages.push({ lines });
+      }
+
+      return pages;
+    }
+
+    // ===== UI =====
+    const pdfInput = $('#pdfFile');
+    const fileInfo = $('#fileInfo');
+    const processBtn = $('#processBtn');
+    const downloadTxtBtn = $('#downloadTxtBtn');
+    const output = $('#output');
+    const statsBox = $('#statsBox');
+    const statPages = $('#statPages');
+    const statRemoved = $('#statRemoved');
+    const statSystem = $('#statSystem');
+
+    let lastResult = null;
+
+    pdfInput.addEventListener('change', () => {
+      const file = pdfInput.files?.[0];
+      if (file) {
+        fileInfo.innerHTML = `<span class="file-name">${file.name}</span> (${(file.size / 1024).toFixed(1)} KB)`;
+      } else {
+        fileInfo.innerHTML = `<span class="file-name">Nenhum arquivo selecionado</span>`;
+      }
+      hideError();
+    });
+
+    processBtn.addEventListener('click', async () => {
+      const file = pdfInput.files?.[0];
+      if (!file) {
+        showError('Selecione um arquivo PDF');
+        return;
+      }
+
+      processBtn.disabled = true;
+      processBtn.innerHTML = '<span class="loading"></span> Processando...';
+      hideError();
+
+      try {
+        const pages = await extractFromPDF(file);
+        const fullText = pages.map(p => p.lines.map(l => l.text).join('\n')).join('\n\n');
+
+        let selectedSystem = getSelectedSystem();
+        if (selectedSystem === 'auto') {
+          selectedSystem = detectSystem(fullText);
+        }
+
+        const result = Cleaner.clean(pages, {
+          system: selectedSystem,
+          removeHash: $('#rmHash').checked,
+          removeSignature: $('#rmAssinatura').checked,
+          removeProtocol: $('#rmProtocolo').checked,
+          removePageNum: $('#rmPageNum').checked,
+          removeHeader: $('#rmHeader').checked,
+        });
+
+        output.value = result.text;
+        lastResult = result;
+
+        statPages.textContent = result.stats.pages;
+        statRemoved.textContent = result.stats.removed;
+        statSystem.textContent = SYSTEM_PATTERNS[selectedSystem]?.name || selectedSystem.toUpperCase();
+        statsBox.style.display = 'block';
+
+        downloadTxtBtn.disabled = false;
+
+      } catch (err) {
+        console.error(err);
+        showError('Falha ao processar PDF. Verifique se o arquivo é válido.');
+      } finally {
+        processBtn.disabled = false;
+        processBtn.textContent = 'Processar';
+      }
+    });
+
+    downloadTxtBtn.addEventListener('click', () => {
+      if (!lastResult) return;
+      const blob = new Blob([lastResult.text], { type: 'text/plain;charset=utf-8' });
+      saveAs(blob, 'texto_extraido.txt');
+    });
+  </script>
+</body>
+</html>
